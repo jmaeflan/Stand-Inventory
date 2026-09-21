@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: stand-inventory
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_PIN
+        sync: false
