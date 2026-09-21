@@ -56,8 +56,36 @@ app.delete("/api/restock/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+function requirePin(req, res) {
+  if (ADMIN_PIN && req.get("x-admin-pin") !== ADMIN_PIN) { res.status(403).json({ error: "wrong PIN" }); return false; }
+  return true;
+}
+
+app.get("/api/admin/check", (req, res) => { if (requirePin(req, res)) res.json({ ok: true, pinRequired: !!ADMIN_PIN }); });
+
+app.delete("/api/counts/:phase/:key", async (req, res) => {
+  if (!requirePin(req, res)) return;
+  const { phase, key } = req.params;
+  if (!["initial", "final"].includes(phase)) return res.status(400).json({ error: "bad phase" });
+  delete state[phase][key];
+  await persist();
+  res.json({ ok: true });
+});
+
+app.put("/api/restock/:id", async (req, res) => {
+  const r = state.restock.find(x => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: "not found" });
+  const qty = parseInt(req.body?.qty, 10);
+  const product = String(req.body?.product || "").trim();
+  const source = String(req.body?.source || "").trim();
+  if (!product || !source || !(qty > 0)) return res.status(400).json({ error: "product, qty and source required" });
+  Object.assign(r, { product, qty, source });
+  await persist();
+  res.json(r);
+});
+
 app.delete("/api/all", async (req, res) => {
-  if (ADMIN_PIN && req.get("x-admin-pin") !== ADMIN_PIN) return res.status(403).json({ error: "wrong PIN" });
+  if (!requirePin(req, res)) return;
   state = { initial: {}, final: {}, restock: [] };
   await persist();
   res.json({ ok: true });

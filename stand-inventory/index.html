@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stand Inventory</title>
+<style>
+  :root{
+    --paper:#f7f8f6; --ink:#17232b; --muted:#5d6b75; --line:#d5dde2;
+    --field:#ffffff; --green:#1d7a49; --green-ink:#0f4c2c; --amber:#d9930f; --amber-soft:#fff4dc;
+    --red:#b6382f; --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Avenir Next","Segoe UI Variable","Segoe UI",Helvetica,Arial,sans-serif;font-size:16px;line-height:1.4}
+  button,input,select{font:inherit;color:inherit}
+  input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+  header{background:var(--ink);color:#fff;padding:14px 16px 0;position:sticky;top:0;z-index:5}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:820px;margin:0 auto}
+  .top h1{font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .who{display:flex;align-items:center;gap:8px}
+  .who label{font-size:14px;opacity:.8}
+  .who input{width:150px;padding:8px 10px;border-radius:8px;border:1px solid #3a4a55;background:#243239;color:#fff}
+  nav{display:flex;gap:4px;max-width:820px;margin:12px auto 0;overflow-x:auto}
+  nav button{flex:1;min-width:110px;background:transparent;border:0;border-bottom:3px solid transparent;color:#c6d0d6;padding:10px 6px;font-weight:600;cursor:pointer;white-space:nowrap}
+  nav button[aria-selected="true"]{color:#fff;border-bottom-color:var(--amber)}
+
+  main{max-width:820px;margin:0 auto;padding:16px 12px 80px}
+  .panel{display:none}.panel.active{display:block}
+  .intro{color:var(--muted);font-size:15px;margin:0 0 14px}
+  .intro b{color:var(--ink)}
+
+  /* count list */
+  .rows{background:var(--field);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row .name{font-weight:600}
+  .row .others{font-size:13px;color:var(--muted)}
+  .stepper{display:flex;align-items:center}
+  .stepper button{width:44px;height:44px;border:1px solid var(--line);background:#f0f3f5;cursor:pointer;font-size:22px;line-height:1;border-radius:8px 0 0 8px}
+  .stepper button:last-child{border-radius:0 8px 8px 0}
+  .stepper input{width:64px;height:44px;border:1px solid var(--line);border-left:0;border-right:0;text-align:center;font-size:18px;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  .stepper input::-webkit-inner-spin-button,.stepper input::-webkit-outer-spin-button{-webkit-appearance:none}
+  .sect{margin:22px 0 8px;font-size:14px;color:var(--muted);font-weight:600}
+
+  .status{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0}
+  .pill{font-size:13px;color:var(--muted)}
+  .pill b{color:var(--green-ink)}
+  .btn{padding:12px 18px;border-radius:var(--radius);border:0;background:var(--green);color:#fff;font-weight:700;cursor:pointer}
+  .btn.secondary{background:#e8edf0;color:var(--ink)}
+  .btn.danger{background:transparent;color:var(--red);border:1px solid var(--red)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .savebar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 12px;display:flex;justify-content:center;gap:10px;z-index:4}
+  .savebar span{align-self:center;font-size:14px;color:var(--muted)}
+
+  /* restock form */
+  form.restock{background:var(--amber-soft);border:1px solid #f1d79a;border-radius:var(--radius);padding:14px;display:grid;gap:10px;grid-template-columns:1fr 1fr}
+  form.restock label{display:grid;gap:4px;font-size:14px;font-weight:600}
+  form.restock .full{grid-column:1/-1}
+  form.restock select,form.restock input{padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:400}
+  form.restock .btn{background:var(--amber);color:#2b1f00}
+  .log{list-style:none;margin:16px 0 0;padding:0}
+  .log li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
+  .log .meta{font-size:13px;color:var(--muted)}
+  .log button{background:none;border:0;color:var(--red);cursor:pointer;font-weight:600}
+
+  /* summary */
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;font-variant-numeric:tabular-nums}
+  th,td{padding:9px 10px;text-align:right;border-top:1px solid var(--line);font-size:15px}
+  th{background:#eef2f4;font-size:13px;color:var(--muted);border-top:0}
+  th:first-child,td:first-child{text-align:left}
+  td.sold{font-weight:700;color:var(--green-ink)}
+  td.neg{color:var(--red);font-weight:700}
+  tfoot td{font-weight:700;background:#eef2f4}
+  .people{margin:12px 0 0;font-size:14px;color:var(--muted)}
+  .banner{display:none;background:#fff4dc;border:1px solid #f1d79a;color:#5a3d00;padding:10px 12px;border-radius:8px;margin:0 0 14px;font-size:14px}
+  .banner.show{display:block}
+  .adm-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+  .adm-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
+  .adm-head .meta{font-size:13px;color:var(--muted)}
+  .adm-actions{display:flex;gap:8px}
+  .adm-actions button,.rs-edit button{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#f0f3f5;cursor:pointer;font-weight:600}
+  .adm-actions .del{color:var(--red);border-color:var(--red);background:#fff}
+  .adm-detail{padding:0 12px 10px;font-size:14px;color:var(--muted)}
+  .adm-detail summary{cursor:pointer;color:var(--ink);font-weight:600;padding:4px 0}
+  .adm-detail ul{margin:6px 0 0;padding-left:18px;columns:2}
+  .rs-edit{display:grid;grid-template-columns:2fr 1fr 2fr auto;gap:8px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+  .rs-edit select,.rs-edit input{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;min-width:0}
+  .editing-note{background:#e7f3ec;border:1px solid #b7dcc6;color:var(--green-ink);padding:10px 12px;border-radius:8px;margin:0 0 14px;font-size:14px}
+  @media (max-width:560px){ .rs-edit{grid-template-columns:1fr 1fr} .adm-detail ul{columns:1} }
+  .toast{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media (max-width:520px){ .top{flex-wrap:wrap} .who{width:100%} .who input{flex:1} th,td{padding:8px 6px;font-size:14px} }
+  @media (prefers-reduced-motion:reduce){ .toast{transition:none} }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Stand Inventory</h1>
+    <div class="who"><label for="person">Your name</label><input id="person" placeholder="e.g. Sam" autocomplete="off"></div>
+  </div>
+  <nav role="tablist">
+    <button role="tab" data-tab="initial" aria-selected="true">Starting count</button>
+    <button role="tab" data-tab="restock">Restock</button>
+    <button role="tab" data-tab="final">Final count</button>
+    <button role="tab" data-tab="summary">Totals</button>
+    <button role="tab" data-tab="admin">Admin</button>
+  </nav>
+</header>
+
+<main>
+  <div class="banner" id="banner"></div>
+  <section class="panel active" id="panel-initial">
+    <p class="intro">Count what's in front of you and save. Everyone's starting counts get added together.</p>
+    <div id="list-initial"></div>
+  </section>
+
+  <section class="panel" id="panel-restock">
+    <p class="intro">Log anything brought in during the day — how much and where it came from.</p>
+    <form class="restock" id="restock-form">
+      <label class="full">Product <select id="rs-product"></select></label>
+      <label>How many <input id="rs-qty" type="number" min="1" inputmode="numeric" required></label>
+      <label>From where <input id="rs-source" placeholder="e.g. back cooler, Costco run" required></label>
+      <button class="btn full" type="submit">Add restock</button>
+    </form>
+    <ul class="log" id="restock-log"></ul>
+  </section>
+
+  <section class="panel" id="panel-final">
+    <p class="intro">End-of-day count. Same idea — count your area, save, and it rolls into the total.</p>
+    <div id="list-final"></div>
+  </section>
+
+  <section class="panel" id="panel-admin">
+    <p class="intro">Fix mistakes here. <b>Edit</b> opens that person's counts so you can change and re-save them. <b>Delete</b> removes a whole entry (like a misspelled name).</p>
+    <div id="admin"></div>
+  </section>
+
+  <section class="panel" id="panel-summary">
+    <p class="intro"><b>Sold</b> = starting + restock − final.</p>
+    <div class="status">
+      <button class="btn secondary" id="refresh">Refresh</button>
+      <button class="btn secondary" id="export">Download CSV</button>
+      <button class="btn danger" id="reset">Clear everything</button>
+    </div>
+    <div id="summary"></div>
+  </section>
+</main>
+
+<div class="savebar" id="savebar"><span id="save-msg"></span><button class="btn" id="save">Save my counts</button></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PRODUCTS = [
+ "Blake's Triple Jam","Blue Moon","Bud Light","Bud Light Seltzer (Black Cherry)","Busch Light","Coke (Cherry)","Coke (Diet)","Coke (Regular)","Coke (Zero)","Coors","Cutwater (Lemondrop)","Cutwater (Strawberry Marg)","Cutwater (Vodka Trans)","Dasani","Founders All Day IPA","Gold Peak (Unsweetened)","Gold Peak (Zero)","High Noon (Pineapple)","Kona Big Wave","Long Drink (Regular)","Long Drink (Zero)","Lucky One (Lemonade)","Mich Ultra","Miller Lite","MinuteMaid (Lemonade)","Monster","Monster Zero","Nitro (Peach)","Nutrl (Pineapple)","Nutrl (Watermelon)","Smartwater","Sprite","Stella","Sun Cruiser (Iced Tea)","Sun Cruiser (Lemonade)","Sun Cruiser (Pink Lemonade)","Topo Chico Seltzer (Strawberry Guava)","Topo Chico Sabores (Blueberry)","Topo Chico Sabores (Lime)","Topo Chico Sabores (Tangerine)","Two Hearted","Popcorn Cups","Cotton Candy","Peanuts"
+];
+const SNACKS = new Set(["Popcorn Cups","Cotton Candy","Peanuts"]);
+
+const state = { initial:{}, final:{}, restock:[] }; // initial/final: {personKey:{name,counts}}
+let tab = "initial";
+const $ = s => document.querySelector(s);
+const slug = n => n.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const personName = () => $("#person").value.trim();
+
+/* ---------- server ---------- */
+function setBanner(msg){ const b=$("#banner"); b.textContent=msg||""; b.classList.toggle("show",!!msg); }
+async function api(method, url, body, headers={}){
+  const r = await fetch(url, {method, headers:{"Content-Type":"application/json",...headers}, body: body?JSON.stringify(body):undefined});
+  if(!r.ok){ let m="Request failed"; try{ m=(await r.json()).error||m; }catch{} throw new Error(m); }
+  return r.json();
+}
+async function loadAll(){
+  try{
+    const s = await api("GET","/api/state");
+    state.initial=s.initial||{}; state.final=s.final||{}; state.restock=(s.restock||[]).sort((a,b)=>a.time-b.time);
+    setBanner("");
+  }catch(e){ console.error(e); setBanner("Can't reach the server right now. Check your connection and reload."); }
+}
+
+async function saveCounts(phase){
+  const name = personName();
+  if(!name){ toast("Enter your name first"); $("#person").focus(); return; }
+  const counts = {};
+  document.querySelectorAll(`#list-${phase} input[data-product]`).forEach(i=>{
+    const v = parseInt(i.value,10); if(!isNaN(v) && v>0) counts[i.dataset.product]=v;
+  });
+  try{
+    await api("PUT",`/api/counts/${phase}`,{name,counts});
+    state[phase][slug(name)] = {name,counts};
+    toast("Saved");
+    renderStatus(phase);
+  }catch(e){ console.error(e); toast("Save failed — try again"); }
+}
+
+/* ---------- rendering ---------- */
+function totals(phase){
+  const t = {}; PRODUCTS.forEach(p=>t[p]=0);
+  Object.values(state[phase]).forEach(e=>{ for(const p in e.counts) t[p]=(t[p]||0)+e.counts[p]; });
+  return t;
+}
+function restockTotals(){
+  const t = {}; PRODUCTS.forEach(p=>t[p]=0);
+  state.restock.forEach(r=>{ t[r.product]=(t[r.product]||0)+r.qty; });
+  return t;
+}
+function othersTotal(phase, product){
+  const me = slug(personName());
+  let n=0, people=0;
+  for(const k in state[phase]){ if(k===me) continue; const c=state[phase][k].counts[product]; if(c){n+=c;people++;} }
+  return {n,people};
+}
+
+function renderCountList(phase){
+  const note = editingFor ? `<div class="editing-note">Editing <b>${esc(editingFor)}</b>'s counts. Change numbers and tap Save. <button class="btn secondary" style="padding:4px 10px;margin-left:6px" id="stop-edit">Done</button></div>` : "";
+  const mine = state[phase][slug(personName())]?.counts || {};
+  const rows = PRODUCTS.map(p=>{
+    const o = othersTotal(phase,p);
+    return `<div class="row">
+      <div><div class="name">${p}</div>${o.people?`<div class="others">Others counted ${o.n}</div>`:""}</div>
+      <div class="stepper">
+        <button type="button" data-step="-1" aria-label="minus one">−</button>
+        <input type="number" min="0" inputmode="numeric" data-product="${p}" value="${mine[p]||0}">
+        <button type="button" data-step="1" aria-label="plus one">+</button>
+      </div></div>`;
+  });
+  const drinks = rows.filter((_,i)=>!SNACKS.has(PRODUCTS[i])).join("");
+  const snacks = rows.filter((_,i)=>SNACKS.has(PRODUCTS[i])).join("");
+  $(`#list-${phase}`).innerHTML = note + `<div class="sect">Drinks</div><div class="rows">${drinks}</div><div class="sect">Snacks</div><div class="rows">${snacks}</div>`;
+}
+function renderStatus(phase){
+  const people = Object.values(state[phase]).map(e=>e.name);
+  const me = state[phase][slug(personName())];
+  $("#save-msg").innerHTML = people.length
+    ? `Saved so far: <b>${people.join(", ")}</b>${me?" (you're included)":""}`
+    : "No one has saved yet";
+}
+
+function renderRestock(){
+  const sel = $("#rs-product");
+  if(!sel.options.length) sel.innerHTML = PRODUCTS.map(p=>`<option>${p}</option>`).join("");
+  $("#restock-log").innerHTML = state.restock.length ? state.restock.map(r=>`
+    <li><div><b>+${r.qty}</b> ${r.product}<div class="meta">${r.source} · ${r.by||"unknown"} · ${new Date(r.time).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</div></div>
+    <button data-del="${r.id}">Remove</button></li>`).join("")
+    : `<li><span class="meta">Nothing restocked yet.</span></li>`;
+}
+
+function renderSummary(){
+  const s=totals("initial"), r=restockTotals(), f=totals("final");
+  let T={s:0,r:0,f:0,sold:0};
+  const body = PRODUCTS.map(p=>{
+    const sold = s[p]+r[p]-f[p]; T.s+=s[p];T.r+=r[p];T.f+=f[p];T.sold+=sold;
+    return `<tr><td>${p}</td><td>${s[p]}</td><td>${r[p]}</td><td>${f[p]}</td><td class="${sold<0?"neg":"sold"}">${sold}</td></tr>`;
+  }).join("");
+  const who = ph => Object.values(state[ph]).map(e=>e.name).join(", ") || "no one yet";
+  $("#summary").innerHTML = `<table><thead><tr><th>Product</th><th>Start</th><th>Restock</th><th>Final</th><th>Sold</th></tr></thead>
+    <tbody>${body}</tbody><tfoot><tr><td>Total</td><td>${T.s}</td><td>${T.r}</td><td>${T.f}</td><td>${T.sold}</td></tr></tfoot></table>
+    <p class="people">Starting counts from: ${who("initial")}<br>Final counts from: ${who("final")}<br>Restock entries: ${state.restock.length}</p>`;
+}
+
+let editingFor = "", myName = "", adminPin = "";
+const esc = t => String(t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pinHeader = () => ({"x-admin-pin": adminPin});
+
+function renderAdmin(){
+  const phases = [["initial","Starting counts"],["final","Final counts"]];
+  let html = "";
+  for(const [ph,label] of phases){
+    const entries = Object.entries(state[ph]).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+    html += `<div class="sect">${label}</div>`;
+    if(!entries.length){ html += `<p class="intro">No one has saved yet.</p>`; continue; }
+    for(const [key,e] of entries){
+      const items = Object.entries(e.counts).filter(([,n])=>n>0);
+      const total = items.reduce((t,[,n])=>t+n,0);
+      const when = e.time ? new Date(e.time).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
+      html += `<div class="adm-card"><div class="adm-head">
+        <div><b>${esc(e.name)}</b><div class="meta">${items.length} products · ${total} items${when?" · saved "+when:""}</div></div>
+        <div class="adm-actions"><button data-edit="${ph}|${esc(e.name)}">Edit</button><button class="del" data-delcount="${ph}|${key}|${esc(e.name)}">Delete</button></div></div>
+        ${items.length?`<details class="adm-detail"><summary>Show items</summary><ul>${items.map(([p,n])=>`<li>${esc(p)}: ${n}</li>`).join("")}</ul></details>`:""}</div>`;
+    }
+  }
+  html += `<div class="sect">Restocks</div>`;
+  if(!state.restock.length) html += `<p class="intro">Nothing restocked yet.</p>`;
+  else html += `<div class="adm-card">${state.restock.map(r=>`<div class="rs-edit" data-rs="${r.id}">
+      <select>${PRODUCTS.map(p=>`<option${p===r.product?" selected":""}>${esc(p)}</option>`).join("")}</select>
+      <input type="number" min="1" inputmode="numeric" value="${r.qty}" aria-label="Quantity">
+      <input value="${esc(r.source)}" aria-label="Source">
+      <div class="adm-actions"><button data-rssave="${r.id}">Save</button><button class="del" data-del="${r.id}">Delete</button></div></div>`).join("")}</div>`;
+  $("#admin").innerHTML = html;
+}
+
+async function ensurePin(){
+  try{ await api("GET","/api/admin/check",null,pinHeader()); return true; }
+  catch(e){
+    if(e.message!=="wrong PIN"){ toast("Can't reach the server"); return false; }
+    const p = prompt(adminPin ? "Wrong PIN — try again:" : "Enter the admin PIN:");
+    if(p===null) return false;
+    adminPin = p; return ensurePin();
+  }
+}
+
+function renderTab(){
+  document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===tab));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
+  const counting = tab==="initial"||tab==="final";
+  $("#savebar").style.display = counting ? "flex" : "none";
+  if(counting){ renderCountList(tab); renderStatus(tab); }
+  else if(tab==="restock") renderRestock();
+  else if(tab==="admin") renderAdmin();
+  else renderSummary();
+}
+
+/* ---------- events ---------- */
+document.querySelector("nav").addEventListener("click", async e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.tab==="admin" && !(await ensurePin())) return;
+  if(editingFor && !["initial","final"].includes(b.dataset.tab)) stopEditing();
+  tab=b.dataset.tab; await loadAll(); renderTab();
+});
+function stopEditing(){ $("#person").value = myName; editingFor=""; }
+document.body.addEventListener("click", e=>{
+  const st=e.target.closest("[data-step]"); if(st){
+    const inp=st.parentElement.querySelector("input"); inp.value=Math.max(0,(parseInt(inp.value,10)||0)+ +st.dataset.step);
+  }
+});
+$("#admin").addEventListener("click", async e=>{
+  const ed=e.target.closest("[data-edit]");
+  if(ed){
+    const [ph,name]=ed.dataset.edit.split("|");
+    if(!editingFor) myName=$("#person").value;
+    editingFor=name; $("#person").value=name; tab=ph; renderTab(); window.scrollTo(0,0); return;
+  }
+  const dc=e.target.closest("[data-delcount]");
+  if(dc){
+    const [ph,key,name]=dc.dataset.delcount.split("|");
+    if(!confirm(`Delete ${name}'s ${ph==="initial"?"starting":"final"} counts? This removes them from the totals.`)) return;
+    try{ await api("DELETE",`/api/counts/${ph}/${encodeURIComponent(key)}`,null,pinHeader()); delete state[ph][key]; renderAdmin(); toast("Deleted"); }
+    catch(err){ console.error(err); toast("Couldn't delete"); }
+    return;
+  }
+  const rs=e.target.closest("[data-rssave]");
+  if(rs){
+    const row=rs.closest("[data-rs]"); const [sel,qty,src]=row.querySelectorAll("select,input");
+    const body={product:sel.value, qty:parseInt(qty.value,10), source:src.value.trim()};
+    if(!(body.qty>0)||!body.source){ toast("Need a quantity and source"); return; }
+    try{ const upd=await api("PUT",`/api/restock/${rs.dataset.rssave}`,body); Object.assign(state.restock.find(r=>r.id===upd.id),upd); toast("Restock updated"); }
+    catch(err){ console.error(err); toast("Couldn't update"); }
+    return;
+  }
+  const rd=e.target.closest("[data-del]");
+  if(rd){
+    if(!confirm("Delete this restock entry?")) return;
+    try{ await api("DELETE",`/api/restock/${rd.dataset.del}`); state.restock=state.restock.filter(r=>r.id!==rd.dataset.del); renderAdmin(); toast("Deleted"); }
+    catch(err){ console.error(err); toast("Couldn't delete"); }
+  }
+});
+document.body.addEventListener("click", e=>{ if(e.target.id==="stop-edit"){ stopEditing(); tab="admin"; renderTab(); } });
+
+$("#save").addEventListener("click", ()=>saveCounts(tab));
+$("#person").addEventListener("change", ()=>{ if(tab==="initial"||tab==="final") renderTab(); });
+
+$("#restock-form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const entry={product:$("#rs-product").value, qty:parseInt($("#rs-qty").value,10), source:$("#rs-source").value.trim(), by:personName()||""};
+  if(!entry.qty||!entry.source) return;
+  try{ const saved=await api("POST","/api/restock",entry); state.restock.push(saved); toast("Restock added");
+    $("#rs-qty").value=""; $("#rs-source").value=""; renderRestock();
+  }catch(err){ console.error(err); toast("Couldn't add — try again"); }
+});
+$("#restock-log").addEventListener("click", async e=>{
+  const b=e.target.closest("[data-del]"); if(!b) return;
+  try{ await api("DELETE",`/api/restock/${b.dataset.del}`); state.restock=state.restock.filter(r=>r.id!==b.dataset.del); renderRestock(); toast("Removed"); }
+  catch(err){ console.error(err); toast("Couldn't remove"); }
+});
+
+$("#export").addEventListener("click", ()=>{
+  const s=totals("initial"), r=restockTotals(), f=totals("final");
+  let csv="Product,Start,Restock,Final,Sold\n"+PRODUCTS.map(p=>`"${p}",${s[p]},${r[p]},${f[p]},${s[p]+r[p]-f[p]}`).join("\n");
+  csv+="\n\nRestock log\nTime,Product,Qty,Source,By\n"+state.restock.map(x=>`${new Date(x.time).toLocaleString()},"${x.product}",${x.qty},"${x.source}","${x.by||""}"`).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+});
+$("#reset").addEventListener("click", async ()=>{
+  if(!confirm("Delete all counts and restock entries for everyone? Download the CSV first if you need it.")) return;
+  if(!(await ensurePin())) return;
+  try{ await api("DELETE","/api/all",null,pinHeader()); await loadAll(); renderTab(); toast("Cleared"); }
+  catch(err){ console.error(err); toast(err.message==="wrong PIN"?"Wrong PIN":"Couldn't clear everything"); }
+});
+
+let toastT; function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1800); }
+
+$("#refresh").addEventListener("click", async ()=>{ await loadAll(); renderTab(); toast("Updated"); });
+setInterval(async ()=>{ if(tab==="summary"||tab==="restock"){ await loadAll(); renderTab(); } }, 15000);
+
+/* ---------- boot ---------- */
+(async()=>{ $("#save-msg").textContent="Loading…"; await loadAll(); renderTab(); })();
+</script>
+</body>
+</html>
