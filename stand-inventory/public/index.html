@@ -23,7 +23,7 @@
   .who label{font-size:14px;opacity:.8}
   .who input{width:150px;padding:8px 10px;border-radius:8px;border:1px solid #3a4a55;background:#243239;color:#fff}
   nav{display:flex;gap:4px;max-width:820px;margin:12px auto 0;overflow-x:auto}
-  nav button{flex:1;min-width:110px;background:transparent;border:0;border-bottom:3px solid transparent;color:#c6d0d6;padding:10px 6px;font-weight:600;cursor:pointer;white-space:nowrap}
+  nav button{flex:1;min-width:0;background:transparent;border:0;border-bottom:3px solid transparent;color:#c6d0d6;padding:10px 6px;font-weight:600;cursor:pointer;white-space:nowrap}
   nav button[aria-selected="true"]{color:#fff;border-bottom-color:var(--amber)}
 
   main{max-width:820px;margin:0 auto;padding:16px 12px 80px}
@@ -89,9 +89,21 @@
   .rs-edit select,.rs-edit input{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;min-width:0}
   .editing-note{background:#e7f3ec;border:1px solid #b7dcc6;color:var(--green-ink);padding:10px 12px;border-radius:8px;margin:0 0 14px;font-size:14px}
   @media (max-width:560px){ .rs-edit{grid-template-columns:1fr 1fr} .adm-detail ul{columns:1} }
+  .evbar{display:flex;align-items:center;gap:8px;max-width:820px;margin:10px auto 0}
+  .evbar label{font-size:14px;opacity:.8}
+  .evbar select{flex:1;max-width:360px;padding:8px 10px;border-radius:8px;border:1px solid #3a4a55;background:#243239;color:#fff}
+  nav .short{display:none}
+  .evtitle{font-size:18px;font-weight:700;margin:0 0 4px}
+  .adm-new{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .adm-new input{flex:1;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .empty{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;text-align:center}
+  .empty h2{margin:0 0 6px;font-size:20px}
+  .empty p{color:var(--muted);margin:0 0 14px}
+  .empty .adm-new{justify-content:center;max-width:460px;margin:0 auto}
+  .current-tag{font-size:12px;font-weight:700;color:var(--green-ink);background:#e7f3ec;border-radius:999px;padding:2px 8px;margin-left:6px}
   .toast{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
   .toast.show{opacity:1}
-  @media (max-width:520px){ .top{flex-wrap:wrap} .who{width:100%} .who input{flex:1} th,td{padding:8px 6px;font-size:14px} }
+  @media (max-width:520px){ nav .long{display:none} nav .short{display:inline} nav button{padding:10px 2px} .top{flex-wrap:wrap} .who{width:100%} .who input{flex:1} th,td{padding:8px 6px;font-size:14px} }
   @media (prefers-reduced-motion:reduce){ .toast{transition:none} }
 </style>
 </head>
@@ -101,10 +113,11 @@
     <h1>Stand Inventory</h1>
     <div class="who"><label for="person">Your name</label><input id="person" placeholder="e.g. Sam" autocomplete="off"></div>
   </div>
+  <div class="evbar"><label for="event">Event</label><select id="event"></select></div>
   <nav role="tablist">
-    <button role="tab" data-tab="initial" aria-selected="true">Starting count</button>
+    <button role="tab" data-tab="initial" aria-selected="true"><span class="long">Starting count</span><span class="short">Start</span></button>
     <button role="tab" data-tab="restock">Restock</button>
-    <button role="tab" data-tab="final">Final count</button>
+    <button role="tab" data-tab="final"><span class="long">Final count</span><span class="short">Final</span></button>
     <button role="tab" data-tab="summary">Totals</button>
     <button role="tab" data-tab="admin">Admin</button>
   </nav>
@@ -112,6 +125,10 @@
 
 <main>
   <div class="banner" id="banner"></div>
+  <section class="panel" id="panel-empty">
+    <div class="empty"><h2>No events yet</h2><p>Create an event (like "Home game vs. Novi – Sept 26") to start counting.</p>
+      <div class="adm-new"><input id="first-event" placeholder="Event name"><button class="btn" id="create-first">Create event</button></div></div>
+  </section>
   <section class="panel active" id="panel-initial">
     <p class="intro">Count what's in front of you and save. Everyone's starting counts get added together.</p>
     <div id="list-initial"></div>
@@ -135,15 +152,18 @@
 
   <section class="panel" id="panel-admin">
     <p class="intro">Fix mistakes here. <b>Edit</b> opens that person's counts so you can change and re-save them. <b>Delete</b> removes a whole entry (like a misspelled name).</p>
+    <div class="sect">Events</div>
+    <div class="adm-new"><input id="new-event" placeholder="New event name, e.g. Home game vs. Novi – Sept 26"><button class="btn" id="create-event">Create event</button></div>
+    <div id="event-list"></div>
     <div id="admin"></div>
   </section>
 
   <section class="panel" id="panel-summary">
+    <p class="evtitle" id="sum-title"></p>
     <p class="intro"><b>Sold</b> = starting + restock − final.</p>
     <div class="status">
       <button class="btn secondary" id="refresh">Refresh</button>
       <button class="btn secondary" id="export">Download CSV</button>
-      <button class="btn danger" id="reset">Clear everything</button>
     </div>
     <div id="summary"></div>
   </section>
@@ -163,6 +183,7 @@ let tab = "initial";
 const $ = s => document.querySelector(s);
 const slug = n => n.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const personName = () => $("#person").value.trim();
+const esc = t => String(t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 /* ---------- server ---------- */
 function setBanner(msg){ const b=$("#banner"); b.textContent=msg||""; b.classList.toggle("show",!!msg); }
@@ -171,12 +192,30 @@ async function api(method, url, body, headers={}){
   if(!r.ok){ let m="Request failed"; try{ m=(await r.json()).error||m; }catch{} throw new Error(m); }
   return r.json();
 }
+let events = [], eventId = "";
+const EV = () => `/api/events/${eventId}`;
+const currentEvent = () => events.find(e=>e.id===eventId);
+function rememberEvent(id){ try{ localStorage.setItem("stand-event", id); }catch{} }
+function recalledEvent(){ try{ return localStorage.getItem("stand-event")||""; }catch{ return ""; } }
+
 async function loadAll(){
   try{
-    const s = await api("GET","/api/state");
+    events = await api("GET","/api/events");
+    if(!events.find(e=>e.id===eventId)){
+      const saved = recalledEvent();
+      eventId = events.find(e=>e.id===saved) ? saved : (events[0]?.id || "");
+    }
+    renderEventPicker();
+    if(!eventId){ state.initial={}; state.final={}; state.restock=[]; setBanner(""); return; }
+    const s = await api("GET", EV());
     state.initial=s.initial||{}; state.final=s.final||{}; state.restock=(s.restock||[]).sort((a,b)=>a.time-b.time);
     setBanner("");
   }catch(e){ console.error(e); setBanner("Can't reach the server right now. Check your connection and reload."); }
+}
+function renderEventPicker(){
+  const sel=$("#event");
+  sel.innerHTML = events.length ? events.map(e=>`<option value="${e.id}"${e.id===eventId?" selected":""}>${esc(e.name)}</option>`).join("") : `<option>No events yet</option>`;
+  sel.disabled = !events.length;
 }
 
 async function saveCounts(phase){
@@ -187,7 +226,7 @@ async function saveCounts(phase){
     const v = parseInt(i.value,10); if(!isNaN(v) && v>0) counts[i.dataset.product]=v;
   });
   try{
-    await api("PUT",`/api/counts/${phase}`,{name,counts});
+    await api("PUT",`${EV()}/counts/${phase}`,{name,counts});
     state[phase][slug(name)] = {name,counts};
     toast("Saved");
     renderStatus(phase);
@@ -247,6 +286,7 @@ function renderRestock(){
 }
 
 function renderSummary(){
+  $("#sum-title").textContent = currentEvent()?.name || "";
   const s=totals("initial"), r=restockTotals(), f=totals("final");
   let T={s:0,r:0,f:0,sold:0};
   const body = PRODUCTS.map(p=>{
@@ -260,15 +300,22 @@ function renderSummary(){
 }
 
 let editingFor = "", myName = "", adminPin = "";
-const esc = t => String(t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pinHeader = () => ({"x-admin-pin": adminPin});
 
+function renderEventList(){
+  $("#event-list").innerHTML = events.map(e=>`<div class="adm-card"><div class="adm-head">
+    <div><b>${esc(e.name)}</b>${e.id===eventId?'<span class="current-tag">Showing</span>':""}<div class="meta">Created ${new Date(e.created).toLocaleDateString()}</div></div>
+    <div class="adm-actions">${e.id!==eventId?`<button data-open="${e.id}">Open</button>`:""}<button data-rename="${e.id}">Rename</button><button class="del" data-delevent="${e.id}">Delete</button></div></div></div>`).join("");
+}
+
 function renderAdmin(){
+  renderEventList();
+  if(!eventId){ $("#admin").innerHTML=""; return; }
   const phases = [["initial","Starting counts"],["final","Final counts"]];
   let html = "";
   for(const [ph,label] of phases){
     const entries = Object.entries(state[ph]).sort((a,b)=>a[1].name.localeCompare(b[1].name));
-    html += `<div class="sect">${label}</div>`;
+    html += `<div class="sect">${label} — ${esc(currentEvent()?.name||"")}</div>`;
     if(!entries.length){ html += `<p class="intro">No one has saved yet.</p>`; continue; }
     for(const [key,e] of entries){
       const items = Object.entries(e.counts).filter(([,n])=>n>0);
@@ -301,6 +348,11 @@ async function ensurePin(){
 }
 
 function renderTab(){
+  if(!eventId && tab!=="admin"){
+    document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", "false"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-empty"));
+    $("#savebar").style.display="none"; return;
+  }
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===tab));
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
   const counting = tab==="initial"||tab==="final";
@@ -335,7 +387,7 @@ $("#admin").addEventListener("click", async e=>{
   if(dc){
     const [ph,key,name]=dc.dataset.delcount.split("|");
     if(!confirm(`Delete ${name}'s ${ph==="initial"?"starting":"final"} counts? This removes them from the totals.`)) return;
-    try{ await api("DELETE",`/api/counts/${ph}/${encodeURIComponent(key)}`,null,pinHeader()); delete state[ph][key]; renderAdmin(); toast("Deleted"); }
+    try{ await api("DELETE",`${EV()}/counts/${ph}/${encodeURIComponent(key)}`,null,pinHeader()); delete state[ph][key]; renderAdmin(); toast("Deleted"); }
     catch(err){ console.error(err); toast("Couldn't delete"); }
     return;
   }
@@ -344,14 +396,14 @@ $("#admin").addEventListener("click", async e=>{
     const row=rs.closest("[data-rs]"); const [sel,qty,src]=row.querySelectorAll("select,input");
     const body={product:sel.value, qty:parseInt(qty.value,10), source:src.value.trim()};
     if(!(body.qty>0)||!body.source){ toast("Need a quantity and source"); return; }
-    try{ const upd=await api("PUT",`/api/restock/${rs.dataset.rssave}`,body); Object.assign(state.restock.find(r=>r.id===upd.id),upd); toast("Restock updated"); }
+    try{ const upd=await api("PUT",`${EV()}/restock/${rs.dataset.rssave}`,body); Object.assign(state.restock.find(r=>r.id===upd.id),upd); toast("Restock updated"); }
     catch(err){ console.error(err); toast("Couldn't update"); }
     return;
   }
   const rd=e.target.closest("[data-del]");
   if(rd){
     if(!confirm("Delete this restock entry?")) return;
-    try{ await api("DELETE",`/api/restock/${rd.dataset.del}`); state.restock=state.restock.filter(r=>r.id!==rd.dataset.del); renderAdmin(); toast("Deleted"); }
+    try{ await api("DELETE",`${EV()}/restock/${rd.dataset.del}`); state.restock=state.restock.filter(r=>r.id!==rd.dataset.del); renderAdmin(); toast("Deleted"); }
     catch(err){ console.error(err); toast("Couldn't delete"); }
   }
 });
@@ -364,27 +416,54 @@ $("#restock-form").addEventListener("submit", async e=>{
   e.preventDefault();
   const entry={product:$("#rs-product").value, qty:parseInt($("#rs-qty").value,10), source:$("#rs-source").value.trim(), by:personName()||""};
   if(!entry.qty||!entry.source) return;
-  try{ const saved=await api("POST","/api/restock",entry); state.restock.push(saved); toast("Restock added");
+  try{ const saved=await api("POST",`${EV()}/restock`,entry); state.restock.push(saved); toast("Restock added");
     $("#rs-qty").value=""; $("#rs-source").value=""; renderRestock();
   }catch(err){ console.error(err); toast("Couldn't add — try again"); }
 });
 $("#restock-log").addEventListener("click", async e=>{
   const b=e.target.closest("[data-del]"); if(!b) return;
-  try{ await api("DELETE",`/api/restock/${b.dataset.del}`); state.restock=state.restock.filter(r=>r.id!==b.dataset.del); renderRestock(); toast("Removed"); }
+  try{ await api("DELETE",`${EV()}/restock/${b.dataset.del}`); state.restock=state.restock.filter(r=>r.id!==b.dataset.del); renderRestock(); toast("Removed"); }
   catch(err){ console.error(err); toast("Couldn't remove"); }
 });
 
 $("#export").addEventListener("click", ()=>{
   const s=totals("initial"), r=restockTotals(), f=totals("final");
-  let csv="Product,Start,Restock,Final,Sold\n"+PRODUCTS.map(p=>`"${p}",${s[p]},${r[p]},${f[p]},${s[p]+r[p]-f[p]}`).join("\n");
+  let csv=`"Event: ${(currentEvent()?.name||"").replace(/"/g,"'")}"\n\nProduct,Start,Restock,Final,Sold\n`+PRODUCTS.map(p=>`"${p}",${s[p]},${r[p]},${f[p]},${s[p]+r[p]-f[p]}`).join("\n");
   csv+="\n\nRestock log\nTime,Product,Qty,Source,By\n"+state.restock.map(x=>`${new Date(x.time).toLocaleString()},"${x.product}",${x.qty},"${x.source}","${x.by||""}"`).join("\n");
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=`inventory-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=`inventory-${slug(currentEvent()?.name||"event")}.csv`; a.click();
 });
-$("#reset").addEventListener("click", async ()=>{
-  if(!confirm("Delete all counts and restock entries for everyone? Download the CSV first if you need it.")) return;
+async function createEvent(input){
+  const name=input.value.trim(); if(!name){ toast("Give the event a name"); input.focus(); return; }
   if(!(await ensurePin())) return;
-  try{ await api("DELETE","/api/all",null,pinHeader()); await loadAll(); renderTab(); toast("Cleared"); }
-  catch(err){ console.error(err); toast(err.message==="wrong PIN"?"Wrong PIN":"Couldn't clear everything"); }
+  try{ const ev=await api("POST","/api/events",{name},pinHeader()); input.value=""; eventId=ev.id; rememberEvent(ev.id);
+    await loadAll(); if(tab==="admin") renderTab(); else { tab="initial"; renderTab(); } toast("Event created"); }
+  catch(err){ console.error(err); toast("Couldn't create event"); }
+}
+$("#create-event").addEventListener("click", ()=>createEvent($("#new-event")));
+$("#create-first").addEventListener("click", ()=>createEvent($("#first-event")));
+$("#event").addEventListener("change", async e=>{
+  eventId=e.target.value; rememberEvent(eventId); if(editingFor) stopEditing();
+  await loadAll(); renderTab(); toast(`Showing ${currentEvent()?.name||"event"}`);
+});
+$("#event-list").addEventListener("click", async e=>{
+  const op=e.target.closest("[data-open]");
+  if(op){ eventId=op.dataset.open; rememberEvent(eventId); await loadAll(); renderTab(); return; }
+  const rn=e.target.closest("[data-rename]");
+  if(rn){
+    const ev=events.find(x=>x.id===rn.dataset.rename); const name=prompt("New name for this event:", ev?.name||"");
+    if(!name||!name.trim()) return;
+    try{ await api("PATCH",`/api/events/${rn.dataset.rename}`,{name:name.trim()},pinHeader()); await loadAll(); renderTab(); toast("Renamed"); }
+    catch(err){ console.error(err); toast("Couldn't rename"); }
+    return;
+  }
+  const de=e.target.closest("[data-delevent]");
+  if(de){
+    const ev=events.find(x=>x.id===de.dataset.delevent);
+    if(!confirm(`Delete "${ev?.name}" and all of its counts and restocks? Download its CSV first if you want a copy.`)) return;
+    try{ await api("DELETE",`/api/events/${de.dataset.delevent}`,null,pinHeader()); if(eventId===de.dataset.delevent) eventId="";
+      await loadAll(); renderTab(); toast("Event deleted"); }
+    catch(err){ console.error(err); toast("Couldn't delete event"); }
+  }
 });
 
 let toastT; function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1800); }
